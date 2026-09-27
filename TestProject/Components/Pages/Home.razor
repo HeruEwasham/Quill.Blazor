@@ -1,0 +1,99 @@
+﻿@page "/"
+@using System.Text.Json
+@using YngveHestem.Quill.Blazor
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<QuillEditor 
+    @ref="_editor"
+    ToolbarOptions="_toolbarOptions"
+    CustomTokens="_myTokens"
+    HistoryOptions="_historyOptions"
+     />
+
+    <br /><br/>
+    <button @onclick="RefreshDelta">Refresh Delta</button>
+    <br/>
+     <textarea cols="200" rows="50">@_deltaContent</textarea>
+
+@code {
+    private QuillEditor? _editor;
+
+    private string _deltaContent = string.Empty;
+
+    // Define your various token buttons with colors and names natively in C#
+    private List<IQuillToken> _myTokens = new()
+    {
+        new QuillToken 
+        { 
+            Id = "USER", 
+            ToolbarButtonHtmlContent = "👤", 
+            OnToolbarButtonClicked = async () => 
+            {
+                return new QuillTokenEventResponse
+                {
+                    Value = "Initial value",
+                    VisibleToken = new HtmlElement
+                    {
+                        InnerHtml = "<p>Value: Initial value</p>",
+                        Styles = new Dictionary<string, string>
+                        {
+                            { "background-color", "#fef3c7" },
+                            { "color", "#b45309" },
+                            { "display", "inline-flex" }
+                        }
+                    }
+                };
+            },
+            OnTokenClicked = async (currentValue) => 
+            {
+                var value = currentValue + "+";
+                return new QuillTokenEventResponse
+                {
+                    Value = value,
+                    VisibleToken = new HtmlElement
+                    {
+                        InnerHtml = "<p>Value: " + value + "</p>",
+                        Styles = new Dictionary<string, string>
+                        {
+                            { "background-color", "#6ef3c7" },
+                            { "color", "#b45309" },
+                            { "display", "inline-flex" }
+                        }
+                    }
+                };
+            }
+        },
+        //new QuillToken { Id = "COMPANY", ToolbarButtonHtmlContent = "🏢 Company Field",  }
+    };
+
+    private object[] _toolbarOptions = new object[]
+    {
+        new object[] { new Dictionary<string, object> { { "font", new object[] { } } }, new Dictionary<string, object> { { "size", new object[] { } } } },
+        new object[] { "bold", "italic", "underline", "strike" },
+        new object[] { "undo", "redo" },
+        new object[] { new Dictionary<string, object> { { "color", new object[] { } } }, new Dictionary<string, object> { { "background", new object[] { } } } },
+        new object[] { new Dictionary<string, object> { { "script", "sub" } }, new Dictionary<string, object> { { "script", "super" } } },
+        new object[] { new Dictionary<string, object> { { "header", 1 } }, new Dictionary<string, object> { { "header", 2 } }, "blockquote", "code-block" },
+        new object[] { new Dictionary<string, object> { { "list", "ordered" } }, new Dictionary<string, object> { { "list", "bullet" } }, new Dictionary<string, object> { { "indent", "-1" } }, new Dictionary<string, object> { { "indent", "+1" } } },
+        new object[] { new Dictionary<string, object> { { "direction", "rtl" } }, new Dictionary<string, object> { { "align", new object[] { } } } },
+        new object[] { "link", "image", "video" },
+        new object[] { "clean" },
+        new object[] { "USER" }
+    };
+
+    private HistoryOptions _historyOptions = new HistoryOptions();
+
+    private async Task RefreshDelta()
+    {
+        var delta = await _editor.GetContents();
+        var options = new JsonSerializerOptions{ WriteIndented = true };
+        _deltaContent = JsonSerializer.Serialize(delta, options);
+        StateHasChanged();
+    }
+}

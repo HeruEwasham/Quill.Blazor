@@ -1,0 +1,763 @@
+@using System.Text.Json
+@using Microsoft.JSInterop
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<div class="quill-wrapper" style="border: 1px solid #ccc; min-height: 350px;">
+    <div @ref="_editorElement" style="height: 300px;" id="@_editorHtmlId"></div>
+</div>
+
+@code {
+    private ElementReference _editorElement;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<QuillEditor>? _objectReference;
+    private string _editorHtmlId = $"quillEditor{Guid.NewGuid()}";
+
+    [Parameter] public object[]? ToolbarOptions { get; set; }
+    [Parameter] public List<IQuillToken> CustomTokens { get; set; } = new();
+    [Parameter] public HistoryOptions? HistoryOptions { get; set; }
+    [Parameter] public string Theme { get; set; } = "snow";
+    [Parameter] public string[]? Formats { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool ReadOnly { get; set; } = false;
+    /*[Parameter] public bool Syntax { get; set; } = false;
+    [Parameter] public string? HighlightCss { get; set; } = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/styles/default.min.css";
+    [Parameter] public string? HighlightJs { get; set; } = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/highlight.min.js";*/
+
+    [Parameter] public EventCallback<QuillOnTextChangeEventArgs> OnTextChange { get; set; }
+    [Parameter] public EventCallback<QuillOnSelectionChangeEventArgs> OnSelectionChange { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Console.WriteLine("OnAfterRenderAsync called");
+        if (firstRender)
+        {
+            _objectReference = DotNetObjectReference.Create(this);
+
+            Console.WriteLine("Load js-module");
+            // Load the isolated JS file next to the razor file
+            _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/YngveHestem.Quill.Blazor/QuillEditor.razor.js");
+            Console.WriteLine("Loaded js-module: " + _jsModule);
+
+            // Serialize configurations to JSON cleanly
+            var config = new 
+            { 
+                tokens = CustomTokens, 
+                toolbarOptions = ToolbarOptions,
+                history = HistoryOptions,
+                theme = Theme,
+                formats = Formats,
+                placeholder = Placeholder,
+                readOnly = ReadOnly,
+                /*syntax = Syntax,
+                highlightCss = HighlightCss,
+                highlightJs = HighlightJs*/
+            };
+            var configJson = JsonSerializer.Serialize(config, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+            await _jsModule.InvokeVoidAsync("initialize", _editorElement, _objectReference, configJson, _editorHtmlId);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnToolbarTokenClicked(string tokenId)
+    {
+        var token = CustomTokens.FirstOrDefault(t => t.Id == tokenId);
+        if (token == null)
+        {
+            return;
+        }
+        var res = await token.OnToolbarButtonClicked();
+        if (res != null)
+        {
+            await InsertToken(tokenId, res.Value, res.VisibleToken);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTokenClicked(int index, string id, string value)
+    {
+        var token = CustomTokens.FirstOrDefault(t => t.Id == id);
+        if (token == null)
+        {
+            return;
+        }
+        var res = await token.OnTokenClicked(value);
+        if (res != null)
+        {
+            await UpdateToken(index, id, res.Value, res.VisibleToken);
+        }
+    }
+
+    [JSInvokable]
+    public async Task CallOnTextChange(QuillDelta delta, QuillDelta oldDelta, string source)
+    {
+        QuillSource sourceAsEnum;
+        switch(source)
+        {
+            case "user":
+                sourceAsEnum = QuillSource.User;
+                break;
+            case "api":
+                sourceAsEnum = QuillSource.Api;
+                break;
+            case "silent":
+                sourceAsEnum = QuillSource.Silent;
+                break;
+            default:
+                sourceAsEnum = QuillSource.Api;
+                break;
+        }
+        await OnTextChange.InvokeAsync(new QuillOnTextChangeEventArgs(delta, oldDelta, sourceAsEnum));
+    }
+
+    [JSInvokable]
+    public async Task CallOnSelectionChange(QuillRange range, QuillRange oldRange, string source)
+    {
+        QuillSource sourceAsEnum;
+        switch(source)
+        {
+            case "user":
+                sourceAsEnum = QuillSource.User;
+                break;
+            case "api":
+                sourceAsEnum = QuillSource.Api;
+                break;
+            case "silent":
+                sourceAsEnum = QuillSource.Silent;
+                break;
+            default:
+                sourceAsEnum = QuillSource.Api;
+                break;
+        }
+        await OnSelectionChange.InvokeAsync(new QuillOnSelectionChangeEventArgs(range, oldRange, sourceAsEnum));
+    }
+
+    // Public API Methods exposed to parent pages
+    public async Task InsertToken(string tokenId, string value, HtmlElement visibleToken)
+    {
+        if (_jsModule != null)
+            await _jsModule.InvokeVoidAsync("insertToken", _editorElement, tokenId, value, visibleToken);
+    }
+
+    public async Task UpdateToken(int index, string tokenId, string value, HtmlElement visibleToken)
+    {
+        if (_jsModule != null)
+            await _jsModule.InvokeVoidAsync("updateToken", _editorElement, index, tokenId, value, visibleToken);
+    }
+
+    public async Task<int> GetCurrentCursorIndex()
+    {
+        if (_jsModule == null) return 0;
+        return await _jsModule.InvokeAsync<int>("getCursorIndex", _editorElement);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _objectReference?.Dispose();
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+
+    // History-module api:
+
+    /// <summary>
+    /// Clears the history stack.
+    /// </summary>
+    /// <returns></returns>
+    public async Task ClearHistory()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("clearHistory", _editorElement);
+        }
+    }
+
+    /// <summary>
+    /// Normally changes made in short succession (configured by delay) are merged as a single change, so that triggering an undo will undo multiple changes. Using cutoff() will reset the merger window so that a changes before and after cutoff() is called will not be merged.
+    /// </summary>
+    /// <returns></returns>
+    public async Task CutoffHistory()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("cutoffHistory", _editorElement);
+        }
+    }
+
+    /// <summary>
+    /// Undo last change.
+    /// </summary>
+    /// <returns></returns>
+    public async Task UndoHistory()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("undoHistory", _editorElement);
+        }
+    }
+
+    /// <summary>
+    /// If last change was an undo, redo this undo. Otherwise does nothing.
+    /// </summary>
+    /// <returns></returns>
+    public async Task RedoHistory()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("redoHistory", _editorElement);
+        }
+    }
+
+    // Api - Content:
+
+    /// <summary>
+    /// Deletes text from the editor, returning a Delta representing the change. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> DeleteText(int index, int length, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("deleteText", _editorElement, index, length, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Retrieves contents of the editor, with formatting data, represented by a Delta object.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<QuillDelta> GetContents()
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+            ;
+        return await _jsModule.InvokeAsync<QuillDelta>("getContents", _editorElement);
+    }
+
+    /// <summary>
+    /// Retrieves the length of the editor contents. Note even when Quill is empty, there is still a blank line represented by '\n', so getLength will return 1.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<int> GetLength()
+    {
+        if (_jsModule == null)
+        {
+            return 0;
+        }
+        return await _jsModule.InvokeAsync<int>("getLength", _editorElement);
+    }
+
+    /// <summary>
+    /// Retrieves the string contents of the editor. Non-string content are omitted, so the returned string's length may be shorter than the editor's as returned by getLength. Note even when Quill is empty, there is still a blank line in the editor, so in these cases getText will return '\n'.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length">The length parameter defaults to the length of the remaining document.</param>
+    /// <returns></returns>
+    public async Task<string> GetText(int index = 0, int? length = null)
+    {
+        if (_jsModule == null)
+        {
+            return string.Empty;
+        }
+        return await _jsModule.InvokeAsync<string>("getText", _editorElement, index, length);
+    }
+
+    /// <summary>
+    /// Get the HTML representation of the editor contents. This method is useful for exporting the contents of the editor in a format that can be used in other applications.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length">The length parameter defaults to the length of the remaining document.</param>
+    /// <returns></returns>
+    public async Task<string> GetSemanticHTML(int index = 0, int? length = null)
+    {
+        if (_jsModule == null)
+        {
+            return string.Empty;
+        }
+        return await _jsModule.InvokeAsync<string>("getSemanticHTML", _editorElement, index, length);
+    }
+
+    /// <summary>
+    /// Insert embedded content into the editor, returning a Delta representing the change. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="type"></param>
+    /// <param name="value"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> InsertEmbed(int index, string type, object value, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("insertEmbed", _editorElement, index, type, value, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Inserts text into the editor, optionally with a specified format or multiple formats. Returns a Delta representing the change. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="text"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> InsertText(int index, string text, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("insertTextSign1", _editorElement, index, text, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Inserts text into the editor, optionally with a specified format or multiple formats. Returns a Delta representing the change. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="text"></param>
+    /// <param name="format"></param>
+    /// <param name="value"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> InsertText(int index, string text, string format, object value, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("insertTextSign2", _editorElement, index, text, format, value, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Inserts text into the editor, optionally with a specified format or multiple formats. Returns a Delta representing the change. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="text"></param>
+    /// <param name="formats"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> InsertText(int index, string text, Dictionary<string, object> formats, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("insertTextSign3", _editorElement, index, text, formats, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Overwrites editor with given contents. Contents should end with a newline. Returns a Delta representing the change. This will be the same as the Delta passed in, if given Delta had no invalid operations. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="delta"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> SetContents(QuillDelta delta, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("setContents", _editorElement, delta, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Sets contents of editor with given text, returning a Delta representing the change. Note Quill documents must end with a newline so one will be added for you if omitted. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> SetText(string text, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("setText", _editorElement, text, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Applies Delta to editor contents, returning a Delta representing the change. These Deltas will be the same if the Delta passed in had no invalid operations. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="delta"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> UpdateContents(QuillDelta delta, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("updateContents", _editorElement, delta, source.ToCorrectJsString());
+    }
+
+    // Api - Formatting:
+
+    /// <summary>
+    /// Format text at user's current selection, returning a Delta representing the change. If the user's selection length is 0, i.e. it is a cursor, the format will be set active, so the next character the user types will have that formatting. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="value"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> Format(string name, object value, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("format", _editorElement, name, value, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Formats all lines in given range, returning a Delta representing the change. See formats for a list of available formats. Has no effect when called with inline formats. To remove formatting, pass false for the value argument. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> FormatLine(int index, int length, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("formatLineSign1", _editorElement, index, length, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Formats all lines in given range, returning a Delta representing the change. See formats for a list of available formats. Has no effect when called with inline formats. To remove formatting, pass false for the value argument. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="format"></param>
+    /// <param name="value"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> FormatLine(int index, int length, string format, object value, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("formatLineSign2", _editorElement, index, length, format, value, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Formats all lines in given range, returning a Delta representing the change. See formats for a list of available formats. Has no effect when called with inline formats. To remove formatting, pass false for the value argument. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="formats"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> FormatLine(int index, int length, Dictionary<string, object> formats, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("formatLineSign3", _editorElement, index, length, formats, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Formats text in the editor, returning a Delta representing the change. For line level formats, such as text alignment, target the newline character or use the formatLine helper. See formats for a list of available formats. To remove formatting, pass false for the value argument. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> FormatText(int index, int length, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("formatTextSign1", _editorElement, index, length, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Formats text in the editor, returning a Delta representing the change. For line level formats, such as text alignment, target the newline character or use the formatLine helper. See formats for a list of available formats. To remove formatting, pass false for the value argument. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="format"></param>
+    /// <param name="value"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> FormatText(int index, int length, string format, object value, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("formatTextSign2", _editorElement, index, length, format, value, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Formats text in the editor, returning a Delta representing the change. For line level formats, such as text alignment, target the newline character or use the formatLine helper. See formats for a list of available formats. To remove formatting, pass false for the value argument. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="formats"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> FormatText(int index, int length, Dictionary<string, object> formats, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("formatTextSign3", _editorElement, index, length, formats, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Retrieves common formatting of the text in the given range. For a format to be reported, all text within the range must have a truthy value. If there are different truthy values, an array with all truthy values will be reported. If no range is supplied, the user's current selection range is used. May be used to show which formats have been set on the cursor. If called with no arguments, the user's current selection range will be used.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<Dictionary<string, object>> GetFormat()
+    {
+        if (_jsModule == null)
+        {
+            return new Dictionary<string, object>();
+        }
+        return await _jsModule.InvokeAsync<Dictionary<string, object>>("getFormatSign1", _editorElement);
+    }
+
+    /// <summary>
+    /// Retrieves common formatting of the text in the given range. For a format to be reported, all text within the range must have a truthy value. If there are different truthy values, an array with all truthy values will be reported. If no range is supplied, the user's current selection range is used. May be used to show which formats have been set on the cursor. If called with no arguments, the user's current selection range will be used.
+    /// </summary>
+    /// <param name="range"></param>
+    /// <returns></returns>
+    public async Task<Dictionary<string, object>> GetFormat(QuillRange range)
+    {
+        if (_jsModule == null)
+        {
+            return new Dictionary<string, object>();
+        }
+        return await _jsModule.InvokeAsync<Dictionary<string, object>>("getFormatSign2", _editorElement, range);
+    }
+
+    /// <summary>
+    /// Retrieves common formatting of the text in the given range. For a format to be reported, all text within the range must have a truthy value. If there are different truthy values, an array with all truthy values will be reported. If no range is supplied, the user's current selection range is used. May be used to show which formats have been set on the cursor. If called with no arguments, the user's current selection range will be used.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <returns></returns>
+    public async Task<Dictionary<string, object>> GetFormat(int index, int length = 0)
+    {
+        if (_jsModule == null)
+        {
+            return new Dictionary<string, object>();
+        }
+        return await _jsModule.InvokeAsync<Dictionary<string, object>>("getFormatSign3", _editorElement, index, length);
+    }
+
+    /// <summary>
+    /// Removes all formatting and embeds within given range, returning a Delta representing the change. Line formatting will be removed if any part of the line is included in the range. The user's selection may not be preserved. Source may be "user", "api", or "silent". Calls where the source is "user" when the editor is disabled are ignored.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task<QuillDelta> RemoveFormat(int index, int length, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillDelta();
+        }
+        return await _jsModule.InvokeAsync<QuillDelta>("removeFormat", _editorElement, index, length, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Retrieves the pixel position (relative to the editor container) and dimensions of a selection at a given location. The user's current selection need not be at that index. Useful for calculating where to place tooltips.
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <returns></returns>
+    public async Task<QuillBounds> GetBounds(int index, int length)
+    {
+        if (_jsModule == null)
+        {
+            return new QuillBounds();
+        }
+        return await _jsModule.InvokeAsync<QuillBounds>("getBounds", _editorElement, index, length);
+    }
+
+    /// <summary>
+    /// Retrieves the user's selection range, optionally to focus the editor first. Otherwise null may be returned if editor does not have focus.
+    /// </summary>
+    /// <param name="focus"></param>
+    /// <returns></returns>
+    public async Task<QuillRange?> GetSelection(bool focus = false)
+    {
+        if (_jsModule == null)
+        {
+            return null;
+        }
+        return await _jsModule.InvokeAsync<QuillRange?>("getSelection", _editorElement, focus);
+    }
+
+    /// <summary>
+    /// Sets user selection to given range, which will also focus the editor. Providing null as the selection range will blur the editor. Source may be "user", "api", or "silent".
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="length"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task SetSelection(int index, int length, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("setSelectionSign1", _editorElement, index, length, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Sets user selection to given range, which will also focus the editor. Providing null as the selection range will blur the editor. Source may be "user", "api", or "silent".
+    /// </summary>
+    /// <param name="range"></param>
+    /// <param name="source"></param>
+    /// <returns></returns>
+    public async Task SetSelection(QuillRange? range, QuillSource source = QuillSource.Api)
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("setSelectionSign2", _editorElement, range, source.ToCorrectJsString());
+    }
+
+    /// <summary>
+    /// Scroll the current selection into the visible area. If the selection is already visible, no scrolling will occur. Note: Quill calls this method automatically when setSelection is called, unless the source is "silent".
+    /// </summary>
+    /// <returns></returns>
+    public async Task ScrollSelectionIntoView()
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("scrollSelectionIntoView", _editorElement);
+    }
+
+    // Api- Editor:
+
+    /// <summary>
+    /// Removes focus from the editor.
+    /// </summary>
+    /// <returns></returns>
+    public async Task Blur()
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("blur", _editorElement);
+    }
+
+    /// <summary>
+    /// Shorthand for Enable(false).
+    /// </summary>
+    /// <returns></returns>
+    public async Task Disable()
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("disable", _editorElement);
+    }
+
+    /// <summary>
+    /// Set ability for user to edit, via input devices like the mouse or keyboard. Does not affect capabilities of API calls, when the source is "api" or "silent".
+    /// </summary>
+    /// <param name="enabled"></param>
+    /// <returns></returns>
+    public async Task Enable(bool enabled = true)
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("enable", _editorElement, enabled);
+    }
+
+    /// <summary>
+    /// Focuses the editor and restores its last range.
+    /// </summary>
+    /// <returns></returns>
+    public async Task Focus()
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("focusSign1", _editorElement);
+    }
+
+    /// <summary>
+    /// Focuses the editor and restores its last range.
+    /// </summary>
+    /// <param name="preventScroll"></param>
+    /// <returns></returns>
+    public async Task Focus(bool preventScroll)
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("focusSign2", _editorElement, preventScroll);
+    }
+
+    /// <summary>
+    /// Checks if editor has focus. Note focus on toolbar, tooltips, does not count as the editor.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<bool> HasFocus()
+    {
+        if (_jsModule == null)
+        {
+            return false;
+        }
+        return await _jsModule.InvokeAsync<bool>("hasFocus", _editorElement);
+    }
+
+    /// <summary>
+    /// Synchronously check editor for user updates and fires events, if changes have occurred. Useful for collaborative use cases during conflict resolution requiring the latest up to date state. Source may be "user", "api", or "silent".
+    /// </summary>
+    /// <returns></returns>
+    public async Task Update()
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("update", _editorElement);
+    }
+
+    /// <summary>
+    /// Scrolls the editor to the given pixel position. scrollSelectionIntoView is implemented by calling this method with the bounds of the current selection.
+    /// </summary>
+    /// <param name="bounds"></param>
+    /// <returns></returns>
+    public async Task ScrollRectIntoView(QuillBounds bounds)
+    {
+        if (_jsModule == null)
+        {
+            return;
+        }
+        await _jsModule.InvokeVoidAsync("scrollRectIntoView", _editorElement, bounds);
+    }
+}

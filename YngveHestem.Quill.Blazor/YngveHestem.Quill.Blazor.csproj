@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>1.0.0</Version>
+    <Description>This library is a wrapper around Quilljs editor for Blazor. Contains both most of the methods/api, and support for easy creating own toolbar-fnctionality withot writing javascript.</Description>
+    <PackageReleaseNotes>
+        - Initial release
+    </PackageReleaseNotes>
+    <Authors>Yngve J. K. Hestem</Authors>
+    <Copyright>Copyright (c) Yngve J. K. Hestem 2026</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>Quill qilljs editor toolbar</PackageTags>
+    <SynchReleaseVersion>false</SynchReleaseVersion>
+    <RepositoryUrl>https://github.com/HeruEwasham/Quill.Blazor.git</RepositoryUrl> 
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.6" />
+  </ItemGroup>
+
+</Project>

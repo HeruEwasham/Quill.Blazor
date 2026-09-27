@@ -1,0 +1,30 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.320.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YngveHestem.Quill.Blazor", "YngveHestem.Quill.Blazor\YngveHestem.Quill.Blazor.csproj", "{07844577-9853-642D-15E8-F4F486FC3A39}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestProject", "TestProject\TestProject.csproj", "{8B410F29-F666-455C-9ABB-B4F96B6104CB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{07844577-9853-642D-15E8-F4F486FC3A39}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07844577-9853-642D-15E8-F4F486FC3A39}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07844577-9853-642D-15E8-F4F486FC3A39}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07844577-9853-642D-15E8-F4F486FC3A39}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B410F29-F666-455C-9ABB-B4F96B6104CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B410F29-F666-455C-9ABB-B4F96B6104CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B410F29-F666-455C-9ABB-B4F96B6104CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B410F29-F666-455C-9ABB-B4F96B6104CB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1C52EF54-376C-45DC-9386-E5F4A495B697}
+	EndGlobalSection
+EndGlobal
