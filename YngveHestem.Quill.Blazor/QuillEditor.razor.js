@@ -64,7 +64,6 @@ function ensureQuillLoaded(theme/*, syntax, highlightCss, highlightJs*/) {
 }
 
 export async function initialize(editorElement, dotNetRef, configJson, divId) {
-    console.log("initialize start.");
     try {
         const config = JSON.parse(configJson);
         // Vent til Quill er 100% klar i nettleseren
@@ -79,7 +78,6 @@ export async function initialize(editorElement, dotNetRef, configJson, divId) {
                     
                     static create(args) {
                         let node = super.create();
-
                         if (args.visibleToken.innerHtml) {
                             node.innerHTML = args.visibleToken.innerHtml;
                         }
@@ -127,7 +125,7 @@ export async function initialize(editorElement, dotNetRef, configJson, divId) {
                             id: node.getAttribute('quillCustomToken-id'),
                             value: node.getAttribute('quillCustomToken-value'),
                             visibleToken: {
-                                innerHTML: node.firstElementChild.innerHTML,
+                                innerHtml: node.firstElementChild.innerHTML,
                                 styles: Object.fromEntries([...node.style].map(x => [x, node.style[x]])),
                                 attributes: attributes
                             }
@@ -280,7 +278,7 @@ export function deleteText(editorElement, index, length, source)
 
 export function getContents(editorElement)
 {
-    return editorElement.__quillInstance.getContents();
+    return toStream(JSON.stringify(editorElement.__quillInstance.getContents()));
 }
 
 export function getLength(editorElement)
@@ -292,11 +290,11 @@ export function getText(editorElement, index = 0, length = null)
 {
     if (length)
     {
-        return editorElement.__quillInstance.getText(index, length);
+        return toStream(editorElement.__quillInstance.getText(index, length));
     }
     else
     {
-        return editorElement.__quillInstance.getText(index);
+        return toStream(editorElement.__quillInstance.getText(index));
     }
 }
 
@@ -304,11 +302,11 @@ export function getSemanticHTML(editorElement, index = 0, length = null)
 {
     if (length)
     {
-        return editorElement.__quillInstance.getSemanticHTML(index, length);
+        return toStream(editorElement.__quillInstance.getSemanticHTML(index, length));
     }
     else
     {
-        return editorElement.__quillInstance.getSemanticHTML(index);
+        return toStream(editorElement.__quillInstance.getSemanticHTML(index));
     }
 }
 
@@ -319,32 +317,35 @@ export function insertEmbed(editorElement, index, type, value, source)
 
 export function insertTextSign1(editorElement, index, text, source)
 {
-    return editorElement.__quillInstance.insertText(index, text, source);
+    return toStream(JSON.stringify(editorElement.__quillInstance.insertText(index, fromStream(text), source)));
 }
 
 export function insertTextSign2(editorElement, index, text, format, value, source)
 {
-    return editorElement.__quillInstance.insertText(index, text, format, value, source);
+    return toStream(JSON.stringify(editorElement.__quillInstance.insertText(index, fromStream(text), format, value, source)));
 }
 
 export function insertTextSign3(editorElement, index, text, formats, source)
 {
-    return editorElement.__quillInstance.insertText(index, text, formats, source);
+    return toStream(JSON.stringify(editorElement.__quillInstance.insertText(index, fromStream(text), formats, source)));
 }
 
 export function setContents(editorElement, delta, source)
 {
-    return editorElement.__quillInstance.setContents(delta, source);
+    var deltaAsObject = JSON.parse(fromStream(delta));
+    return toStream(JSON.stringify(editorElement.__quillInstance.setContents(deltaAsObject, source)));
 }
 
 export function setText(editorElement, text, source)
 {
-    return editorElement.__quillInstance.setText(text, source);
+    var textAsString = fromStream(text);
+    return toStream(JSON.stringify(editorElement.__quillInstance.setText(textAsString, source)));
 }
 
 export function updateContents(editorElement, delta, source)
 {
-    return editorElement.__quillInstance.updateContents(delta, source);
+    var deltaAsObject = JSON.parse(fromStream(delta));
+    return toStream(JSON.stringify(editorElement.__quillInstance.updateContents(deltaAsObject, source)));
 }
 
 export function format(editorElement, name, value, source)
@@ -465,4 +466,15 @@ export function update(editorElement)
 export function scrollRectIntoView(editorElement, bounds)
 {
     editorElement.__quillInstance.scrollRectIntoView(bounds);
+}
+
+function toStream(content)
+{
+    return new Blob([content]);
+}
+
+function fromStream(content)
+{
+    const decoder = new TextDecoder();
+    return decoder.decode(content);
 }

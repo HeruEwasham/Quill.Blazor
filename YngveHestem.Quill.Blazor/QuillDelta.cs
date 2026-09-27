@@ -1,10 +1,6 @@
-using System;
-
-namespace YngveHestem.Quill.Blazor;
-
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
+namespace YngveHestem.Quill.Blazor;
 public class QuillDelta
 {
     [JsonPropertyName("ops")]

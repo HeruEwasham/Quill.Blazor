@@ -69,7 +69,38 @@ Welcome to your new app.
                 };
             }
         },
-        //new QuillToken { Id = "COMPANY", ToolbarButtonHtmlContent = "🏢 Company Field",  }
+        new QuillToken 
+        { 
+            Id = "CompanyType",
+            ToolbarButtonHtmlContent = "🏢",
+            OnToolbarButtonClicked = async () =>
+            {
+                return new QuillTokenEventResponse
+                {
+                    Value = "AS",
+                    VisibleToken = new HtmlElement
+                    {
+                        InnerHtml = "Company type: AS"
+                    }
+                };
+            },
+            OnTokenClicked = async (value) =>
+            {
+                var newValue = "AS";
+                if (value == "AS")
+                {
+                    newValue = "Inc.";
+                }
+                return new QuillTokenEventResponse
+                {
+                    Value = newValue,
+                    VisibleToken = new HtmlElement
+                    {
+                        InnerHtml = "Company type: " + newValue
+                    }
+                };
+            }
+        }
     };
 
     private object[] _toolbarOptions = new object[]
@@ -84,7 +115,7 @@ Welcome to your new app.
         new object[] { new Dictionary<string, object> { { "direction", "rtl" } }, new Dictionary<string, object> { { "align", new object[] { } } } },
         new object[] { "link", "image", "video" },
         new object[] { "clean" },
-        new object[] { "USER" }
+        new object[] { "USER", "CompanyType" }
     };
 
     private HistoryOptions _historyOptions = new HistoryOptions();

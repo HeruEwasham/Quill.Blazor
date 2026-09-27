@@ -4,10 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Description>This library is a wrapper around Quilljs editor for Blazor. Contains both most of the methods/api, and support for easy creating own toolbar-fnctionality withot writing javascript.</Description>
     <PackageReleaseNotes>
-        - Initial release
+        - Fixed a bug that made the visible tokens to dissapear on undo.
+        - Changed how some of the methods that possibly send huge amount of data between javascript and Blazor at once to use streams instead of default SignalR.
     </PackageReleaseNotes>
     <Authors>Yngve J. K. Hestem</Authors>
     <Copyright>Copyright (c) Yngve J. K. Hestem 2026</Copyright>

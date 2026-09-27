@@ -22,6 +22,12 @@
     [Parameter] public string[]? Formats { get; set; }
     [Parameter] public string? Placeholder { get; set; }
     [Parameter] public bool ReadOnly { get; set; } = false;
+
+    /// <summary>
+    /// The max allowed ssize of the stream used to ssend the possibly huge content between javascript and Blazor. Default is 10 MB.
+    /// </summary>
+    [Parameter] public long MaxStreamSize { get; set; } = 10 * 1024 * 1024;
+
     /*[Parameter] public bool Syntax { get; set; } = false;
     [Parameter] public string? HighlightCss { get; set; } = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/styles/default.min.css";
     [Parameter] public string? HighlightJs { get; set; } = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/highlight.min.js";*/
@@ -228,7 +234,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("deleteText", _editorElement, index, length, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("deleteText", _editorElement, index, length, source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -241,8 +248,8 @@
         {
             return new QuillDelta();
         }
-            ;
-        return await _jsModule.InvokeAsync<QuillDelta>("getContents", _editorElement);
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("getContents", _editorElement);
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -270,7 +277,8 @@
         {
             return string.Empty;
         }
-        return await _jsModule.InvokeAsync<string>("getText", _editorElement, index, length);
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("getText", _editorElement, index, length);
+        return await res.GetAsString(MaxStreamSize);
     }
 
     /// <summary>
@@ -285,7 +293,8 @@
         {
             return string.Empty;
         }
-        return await _jsModule.InvokeAsync<string>("getSemanticHTML", _editorElement, index, length);
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("getSemanticHTML", _editorElement, index, length);
+        return await res.GetAsString(MaxStreamSize);
     }
 
     /// <summary>
@@ -318,7 +327,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("insertTextSign1", _editorElement, index, text, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("insertTextSign1", _editorElement, index, text.ToJsStream(), source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -336,7 +346,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("insertTextSign2", _editorElement, index, text, format, value, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("insertTextSign2", _editorElement, index, text.ToJsStream(), format, value, source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -353,7 +364,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("insertTextSign3", _editorElement, index, text, formats, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("insertTextSign3", _editorElement, index, text.ToJsStream(), formats, source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -368,7 +380,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("setContents", _editorElement, delta, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("setContents", _editorElement, JsonSerializer.Serialize(delta).ToJsStream(), source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -383,7 +396,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("setText", _editorElement, text, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("setText", _editorElement, text.ToJsStream(), source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     /// <summary>
@@ -398,7 +412,8 @@
         {
             return new QuillDelta();
         }
-        return await _jsModule.InvokeAsync<QuillDelta>("updateContents", _editorElement, delta, source.ToCorrectJsString());
+        var res = await _jsModule.InvokeAsync<IJSStreamReference>("updateContents", _editorElement, JsonSerializer.Serialize(delta).ToJsStream(), source.ToCorrectJsString());
+        return JsonSerializer.Deserialize<QuillDelta>(await res.GetAsString(MaxStreamSize)) ?? new QuillDelta();
     }
 
     // Api - Formatting:

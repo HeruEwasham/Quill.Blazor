@@ -8,7 +8,7 @@ This wrapper do also allow for some custom handlers for toolbar.
 
 It is extreamly simple to get started.
 
-1. Add the nuget-package to your project.
+1. Add the nuget-package to your project (https://www.nuget.org/packages/YngveHestem.Quill.Blazor).
 2. Add this to yuur site where you want the editor: `<QuillEditor></QuillEditor>`.
 
 With only these two steps, you will get a basic editor with the default toolbar-options. No need to manually include css and javascript. The needed css and javascript is automatically loaded when needed.
