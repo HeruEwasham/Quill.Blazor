@@ -109,3 +109,9 @@ Much of this wrapper has properties and methods that mirrors the features in the
 # Remarks
 
 - The code has code to add syntax-module, but as syntax is not working according to multiple isses that is not resolved, it is commented out.
+
+# Disclaimer
+
+While this wrapper is provided under the MIT-licence. The Quill-editor is itself BSD-3. For simplicity for the user, this wrapper automatically adds a reference to Quill on cdn.jsdelivr.net. This wrapper contains no source code or binary itself. But by using this package you also accepts that Quill has it's own seperate licence. See file "QUILL LICENSE" for more info.
+
+Mark that this wrapper is not endorsed or associated with the people behind Quill. This is only a small wrapper to use it in Blazor and still have more freedom to customize it more than other similar wrappers.
